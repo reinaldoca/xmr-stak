@@ -431,8 +431,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     add_definitions(-DNOMINMAX)
 else()
     # activate sse2 and aes-ni
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
 endif()
 
 # add -Wall for debug builds with gcc

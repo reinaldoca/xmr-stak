@@ -23,6 +23,7 @@
 #include <utility>
 #include "soft_aes_altivec.hpp"
 #include <altivec.h>
+#include <math.h>
 #undef vector
 #undef pixel
 #undef bool
@@ -304,15 +305,34 @@ void cn_implode_scratchpad(const __m128i* input, __m128i* output)
 
 inline uint64_t int_sqrt33_1_double_precision(const uint64_t n0)
 {
-//why is half the vector unused here??? maybe optimize by doing 2 sqrts when using 4MB scratchpad?
-  __m128d x = (__m128d)((__m128ll){n0 >> 12,0} + (__m128ll){1023ULL << 52,0});
-  x = vec_sqrt(x);
-  uint64_t r = ((uint64_t*)&x)[0];
+  uint64_t r = (n0 >> 12) + (1023ULL << 52);
+  double rd = sqrt( *(double*)&r );
+  r = *(uint64_t*)&rd;
   const uint64_t s = r >> 20;
 	r >>= 19;
 	uint64_t x2 = (s - (1022ULL << 32)) * (r - s - (1022ULL << 32) + 1);
 	if (x2 < n0) ++r;
 	return r;
+}
+
+inline __m128i int_sqrt33_1_double_precision2(uint64_t n0,uint64_t n1)
+{
+  __m128d x = (__m128d)((__m128ll){n0 >> 12,n1 >> 12} + (__m128ll){1023ULL << 52,1023ULL << 52});
+  x = vec_sqrt(x);
+  uint64_t r0 = ((uint64_t*)&x)[0];
+  uint64_t r1 = ((uint64_t*)&x)[1];
+  uint64_t s0 = r0 >> 20;
+  uint64_t s1 = r1 >> 20;
+	r0 >>= 19;
+	r1 >>= 19;
+	uint64_t x2_0 = (s0 - (1022ULL << 32)) * (r0 - s0 - (1022ULL << 32) + 1);
+	uint64_t x2_1 = (s1 - (1022ULL << 32)) * (r1 - s1 - (1022ULL << 32) + 1);
+	if (x2_0 < n0) ++r0;
+	if (x2_1 < n1) ++r1;
+  ((uint64_t*)&x)[0] = r0;
+  ((uint64_t*)&x)[1] = r1;
+
+  return (__m128i)x;
 }
 
 inline __m128i aes_round_bittube2(const __m128i& val, const __m128i& key)
@@ -438,8 +458,8 @@ struct Cryptonight_hash<1>
   	uint8_t* l0 = ctx[n]->long_state; 
   	/* BEGIN cryptonight_monero_v8 variables */ 
   	__m128i bx1; 
-	  __m128i division_result_xmm; 
-  	GetOptimalSqrtType_t<N> sqrt_result; 
+	  uint64_t division_result; 
+  	uint64_t sqrt_result; 
   	/* END cryptonight_monero_v8 variables */ 
   	{ 
   		uint64_t* h0 = (uint64_t*)ctx[n]->hash_state; 
@@ -449,8 +469,8 @@ struct Cryptonight_hash<1>
   		if(ALGO == cryptonight_monero_v8) 
   		{ 
   			bx1 = (__m128ll){h0[8] ^ h0[10], h0[9] ^ h0[11]}; 
-  			((uint64_t*)&division_result_xmm)[0] = h0[12]; 
-  			assign(sqrt_result, h0[13]); 
+  			division_result = h0[12]; 
+  			sqrt_result = h0[13]; 
   			set_float_rounding_mode(); 
   		} 
   	} 
@@ -501,10 +521,10 @@ struct Cryptonight_hash<1>
     	if(ALGO == cryptonight_monero_v8) 
     	{ 
     		uint64_t sqrt_result_tmp; 
-    		assign(sqrt_result_tmp, sqrt_result); 
+    		sqrt_result_tmp = sqrt_result; 
     		/* Use division and square root results from the _previous_ iteration to hide the latency */ 
     		const uint64_t cx_64 = ((uint64_t*)&cx)[0]; 
-    		cl ^= static_cast<uint64_t>(((uint64_t*)&division_result_xmm)[0]) ^ (sqrt_result_tmp << 32); 
+    		cl ^= static_cast<uint64_t>(division_result) ^ (sqrt_result_tmp << 32); 
     		const uint32_t d = (cx_64 + (sqrt_result_tmp << 1)) | 0x80000001UL; 
     		/* Most and least significant bits in the divisor are set to 1 
     		 * to make sure we don't divide by a small or even number, 
@@ -516,10 +536,10 @@ struct Cryptonight_hash<1>
     		/* Compiler will optimize it to a single div instruction */ 
     		__m128i cx_v = vec_sro(cx,(__m128i){0x40}); 
         const uint64_t cx_s = ((uint64_t*)&cx_v)[0]; 
-    		const uint64_t division_result = static_cast<uint32_t>(cx_s / d) + ((cx_s % d) << 32); 
-    		((uint64_t*)&division_result_xmm)[0] = static_cast<int64_t>(division_result); 
+    		const uint64_t division_result_ = static_cast<uint32_t>(cx_s / d) + ((cx_s % d) << 32); 
+    		division_result = static_cast<int64_t>(division_result_); 
     		/* Use division_result as an input for the square root to prevent parallel implementation in hardware */ 
-    		assign(sqrt_result, int_sqrt33_1_double_precision(cx_64 + division_result)); 
+    		sqrt_result = int_sqrt33_1_double_precision(cx_64 + division_result_); 
     	}
 
     	{ 
@@ -604,6 +624,279 @@ struct Cryptonight_hash<2>
 		constexpr size_t MASK = cn_select_mask<ALGO>();
 		constexpr size_t ITERATIONS = cn_select_iter<ALGO>();
 		constexpr size_t MEM = cn_select_memory<ALGO>();
+    if((ALGO == cryptonight_monero || ALGO == cryptonight_aeon || ALGO == cryptonight_ipbc || ALGO == cryptonight_stellite || ALGO == cryptonight_masari || ALGO == cryptonight_bittube2) && len < 43) 
+  	{ 
+  		memset(output, 0, 32 * N); 
+  		return; 
+  	}
+  	keccak((const uint8_t *)input + len * 0, len, ctx[0]->hash_state, 200); 
+  	keccak((const uint8_t *)input + len * 1, len, ctx[1]->hash_state, 200); 
+  	uint64_t monero_const_0; 
+  	uint64_t monero_const_1; 
+  	if(ALGO == cryptonight_monero || ALGO == cryptonight_aeon || ALGO == cryptonight_ipbc || ALGO == cryptonight_stellite || ALGO == cryptonight_masari || ALGO == cryptonight_bittube2) 
+   	{ 
+    	monero_const_0 =  *reinterpret_cast<const uint64_t*>(reinterpret_cast<const uint8_t*>(input) + len * 0 + 35); 
+    	monero_const_1 =  *reinterpret_cast<const uint64_t*>(reinterpret_cast<const uint8_t*>(input) + len * 1 + 35); 
+   		monero_const_0 ^=  *(reinterpret_cast<const uint64_t*>(ctx[0]->hash_state) + 24); 
+   		monero_const_1 ^=  *(reinterpret_cast<const uint64_t*>(ctx[1]->hash_state) + 24); 
+  	} 
+  	/* Optim - 99% time boundary */ 
+  	cn_explode_scratchpad<MEM, SOFT_AES, PREFETCH, ALGO>((__m128i*)ctx[0]->hash_state, (__m128i*)ctx[0]->long_state); 
+   	cn_explode_scratchpad<MEM, SOFT_AES, PREFETCH, ALGO>((__m128i*)ctx[1]->hash_state, (__m128i*)ctx[1]->long_state); 
+ 	
+  	__m128i ax0,ax0_; 
+  	uint64_t idx0,idx0_; 
+  	__m128i bx0,bx0_; 
+  	uint8_t* l0 = ctx[0]->long_state;
+  	uint8_t* l0_ = ctx[1]->long_state; 
+
+  	/* BEGIN cryptonight_monero_v8 variables */ 
+  	__m128i bx1,bx1_; 
+	  __m128i division_result_xmm; 
+  	__m128i sqrt_result; 
+  	/* END cryptonight_monero_v8 variables */ 
+  	{ 
+  		uint64_t* h0 = (uint64_t*)ctx[0]->hash_state;
+  		uint64_t* h0_ = (uint64_t*)ctx[1]->hash_state; 
+
+  		idx0 = h0[0] ^ h0[4]; 
+  		idx0_ = h0_[0] ^ h0_[4];
+      ax0 = (__m128ll){idx0, h0[1] ^ h0[5]}; 
+      ax0_ = (__m128ll){idx0_, h0_[1] ^ h0_[5]}; 
+  		bx0 = (__m128ll){h0[2] ^ h0[6], h0[3] ^ h0[7]}; 
+  		bx0_ = (__m128ll){h0_[2] ^ h0_[6], h0_[3] ^ h0_[7]}; 
+
+      if(ALGO == cryptonight_monero_v8) 
+  		{ 
+  			bx1 = (__m128ll){h0[8] ^ h0[10], h0[9] ^ h0[11]}; 
+  			bx1_ = (__m128ll){h0_[8] ^ h0_[10], h0_[9] ^ h0_[11]}; 
+  			((uint64_t*)&division_result_xmm)[0] = h0[12]; 
+  			((uint64_t*)&division_result_xmm)[1] = h0_[12]; 
+ 	  		((uint64_t*)&sqrt_result)[0] = h0[13];
+ 	  		((uint64_t*)&sqrt_result)[1] = h0_[13]; 
+
+  			set_float_rounding_mode(); 
+  		} 
+  	} 
+  	__m128i *ptr0,*ptr0_;
+
+		// Optim - 90% time boundary
+		for(size_t i = 0; i < ITERATIONS; i++)
+		{
+    	__m128i cx,cx_; 
+    	ptr0 = (__m128i *)&l0[idx0 & MASK]; 
+    	ptr0_ = (__m128i *)&l0_[idx0_ & MASK]; 
+    	cx = vec_ld(0,ptr0); 
+    	cx_ = vec_ld(0,ptr0_); 
+    	if (ALGO == cryptonight_bittube2) 
+    	{ 
+    		cx = aes_round_bittube2(cx, ax0); 
+    		cx_ = aes_round_bittube2(cx_, ax0_); 
+    	} 
+    	else 
+    	{ 
+    			cx = _mm_aesenc_si128(cx, ax0); 
+    			cx_ = _mm_aesenc_si128(cx_, ax0_); 
+    	} 
+    	/* Shuffle the other 3x16 byte chunks in the current 64-byte cache line */ 
+    	if(ALGO == cryptonight_monero_v8) 
+    	{ 
+    		uint64_t idx1 = idx0 & MASK; 
+    		__m128i chunk1 = vec_ld(0,(__m128i *)&l0[idx1 ^ 0x10]); 
+    	 	__m128i chunk2 = vec_ld(0,(__m128i *)&l0[idx1 ^ 0x20]); 
+    		__m128i chunk3 = vec_ld(0,(__m128i *)&l0[idx1 ^ 0x30]); 
+    		*((__m128i *)&l0[idx1 ^ 0x10]) = (__m128ll)chunk3 + (__m128ll)bx1; 
+        *((__m128i *)&l0[idx1 ^ 0x20]) = (__m128ll)chunk1 + (__m128ll)bx0;
+        *((__m128i *)&l0[idx1 ^ 0x30]) = (__m128ll)chunk2 + (__m128ll)ax0;
+
+        idx1 = idx0_ & MASK; 
+    		chunk1 = vec_ld(0,(__m128i *)&l0_[idx1 ^ 0x10]); 
+    	 	chunk2 = vec_ld(0,(__m128i *)&l0_[idx1 ^ 0x20]); 
+    		chunk3 = vec_ld(0,(__m128i *)&l0_[idx1 ^ 0x30]); 
+    		*((__m128i *)&l0_[idx1 ^ 0x10]) = (__m128ll)chunk3 + (__m128ll)bx1_; 
+        *((__m128i *)&l0_[idx1 ^ 0x20]) = (__m128ll)chunk1 + (__m128ll)bx0_;
+        *((__m128i *)&l0_[idx1 ^ 0x30]) = (__m128ll)chunk2 + (__m128ll)ax0_;
+    	}
+
+
+    	if(ALGO == cryptonight_monero || ALGO == cryptonight_aeon || ALGO == cryptonight_ipbc || ALGO == cryptonight_stellite || ALGO == cryptonight_masari || ALGO == cryptonight_bittube2){ 
+    		cryptonight_monero_tweak<ALGO>((uint64_t*)ptr0, vec_xor(bx0, cx)); 
+    		cryptonight_monero_tweak<ALGO>((uint64_t*)ptr0_, vec_xor(bx0_, cx_)); 
+        }
+    	else{ 
+    		vec_st(vec_xor(bx0, cx), 0, (__m128i *)ptr0 );
+    		vec_st(vec_xor(bx0_, cx_), 0, (__m128i *)ptr0_ ); 
+
+        }
+    	idx0 = ((uint64_t*)&cx)[0]; 
+     	idx0_ = ((uint64_t*)&cx_)[0]; 
+   	
+    	ptr0 = (__m128i *)&l0[idx0 & MASK]; 
+    	ptr0_ = (__m128i *)&l0_[idx0_ & MASK]; 
+    	if(ALGO != cryptonight_monero_v8){ 
+    		bx0 = cx;
+    		bx0_ = cx_;
+      }
+    	uint64_t lo, cl, ch, lo_, cl_, ch_;  
+    	uint64_t al0 = ((uint64_t*)&ax0)[0]; 
+    	uint64_t al0_ = ((uint64_t*)&ax0_)[0]; 
+    	uint64_t ah0 = ((uint64_t*)&ax0)[1]; 
+    	uint64_t ah0_ = ((uint64_t*)&ax0_)[1]; 
+    	cl = ((uint64_t*)ptr0)[0]; 
+    	cl_ = ((uint64_t*)ptr0_)[0]; 
+     	ch = ((uint64_t*)ptr0)[1]; 
+    	ch_ = ((uint64_t*)ptr0_)[1]; 
+    	if(ALGO == cryptonight_monero_v8) 
+    	{ 
+    		uint64_t sqrt_result_tmp_0,sqrt_result_tmp_1; 
+    		sqrt_result_tmp_0 = ((uint64_t*)&sqrt_result)[0];
+    		sqrt_result_tmp_1 = ((uint64_t*)&sqrt_result)[1];
+
+    		/* Use division and square root results from the _previous_ iteration to hide the latency */ 
+    		const uint64_t cx_64 = ((uint64_t*)&cx)[0];
+    		const uint64_t cx_64_ = ((uint64_t*)&cx_)[0]; 
+
+    		cl ^= static_cast<uint64_t>(((uint64_t*)&division_result_xmm)[0]) ^ (sqrt_result_tmp_0 << 32);
+    		cl_ ^= static_cast<uint64_t>(((uint64_t*)&division_result_xmm)[1]) ^ (sqrt_result_tmp_1 << 32); 
+
+    		const uint32_t d = (cx_64 + (sqrt_result_tmp_0 << 1)) | 0x80000001UL;
+    		const uint32_t d_ = (cx_64_ + (sqrt_result_tmp_1 << 1)) | 0x80000001UL; 
+
+    		/* Most and least significant bits in the divisor are set to 1 
+    		 * to make sure we don't divide by a small or even number, 
+    		 * so there are no shortcuts for such cases 
+    		 * 
+    		 * Quotient may be as large as (2^64 - 1)/(2^31 + 1) = 8589934588 = 2^33 - 4 
+    		 * We drop the highest bit to fit both quotient and remainder in 32 bits 
+		     */  
+    		/* Compiler will optimize it to a single div instruction */ 
+    		__m128i cx_v = vec_sro(cx,(__m128i){0x40}); 
+    		__m128i cx_v_ = vec_sro(cx_,(__m128i){0x40}); 
+        uint64_t cx_s = ((uint64_t*)&cx_v)[0]; 
+        uint64_t cx_s_ = ((uint64_t*)&cx_v_)[0];
+        //reuse cx_v and cx_v_
+        cx_v = (__m128ll){cx_s,cx_s_};
+        cx_v_ = (__m128ll)cx_v / (__m128ll){d,d_};
+        cx_v = (__m128ll)cx_v % (__m128ll){d,d_};
+
+    		uint64_t division_result_0 = static_cast<uint32_t>(((uint64_t*)&cx_v_)[0]) + (((uint64_t*)&cx_v)[0] << 32); 
+    		uint64_t division_result_1 = static_cast<uint32_t>(((uint64_t*)&cx_v_)[1]) + (((uint64_t*)&cx_v)[1] << 32); 
+        division_result_xmm = (__m128ll){division_result_0,division_result_1}; 
+    		/* Use division_result as an input for the square root to prevent parallel implementation in hardware */ 
+    		sqrt_result =  int_sqrt33_1_double_precision2(cx_64 + division_result_0,cx_64_ + division_result_1); 
+    	}
+
+    	{ 
+    	  uint64_t hi,hi_;
+    		lo = _umul128(idx0, cl, &hi); 
+    		lo_ = _umul128(idx0_, cl_, &hi_); 
+    		/* Shuffle the other 3x16 byte chunks in the current 64-byte cache line */ 
+      	if(ALGO == cryptonight_monero_v8) 
+        { 
+       	  uint64_t idx1 = idx0 & MASK; 
+   		    __m128i chunk1 =  (__m128ll){hi, lo};
+          chunk1 = vec_xor(*(__m128i *)&l0[idx1 ^ 0x10], chunk1); 
+       		__m128i chunk2 = vec_ld(0,(__m128i *)&l0[idx1 ^ 0x20]); 
+       		hi ^= ((uint64_t*)&chunk2)[0]; 
+       		lo ^= ((uint64_t*)&chunk2)[1]; 
+       		__m128i chunk3 = vec_ld(0,(__m128i *)&l0[idx1 ^ 0x30]); 
+         	*((__m128i *)&l0[idx1 ^ 0x10]) = (__m128ll)chunk3 + (__m128ll)bx1; 
+          *((__m128i *)&l0[idx1 ^ 0x20]) = (__m128ll)chunk1 + (__m128ll)bx0;
+          *((__m128i *)&l0[idx1 ^ 0x30]) = (__m128ll)chunk2 + (__m128ll)ax0;
+        
+          idx1 = idx0_ & MASK; 
+   		    chunk1 =  (__m128ll){hi_, lo_};
+          chunk1 = vec_xor(*(__m128i *)&l0_[idx1 ^ 0x10], chunk1); 
+       		chunk2 = vec_ld(0,(__m128i *)&l0_[idx1 ^ 0x20]); 
+       		hi_ ^= ((uint64_t*)&chunk2)[0]; 
+       		lo_ ^= ((uint64_t*)&chunk2)[1]; 
+       		chunk3 = vec_ld(0,(__m128i *)&l0_[idx1 ^ 0x30]); 
+          *((__m128i *)&l0_[idx1 ^ 0x10]) = (__m128ll)chunk3 + (__m128ll)bx1_; 
+          *((__m128i *)&l0_[idx1 ^ 0x20]) = (__m128ll)chunk1 + (__m128ll)bx0_;
+          *((__m128i *)&l0_[idx1 ^ 0x30]) = (__m128ll)chunk2 + (__m128ll)ax0_;
+
+      	}
+
+        ah0 += lo; 
+        ah0_ += lo_; 
+    		al0 += hi; 
+    		al0_ += hi_; 
+    	} 
+    	if(ALGO == cryptonight_monero_v8) 
+    	{ 
+    		bx1 = bx0; 
+    		bx1_ = bx0_; 
+    		bx0 = cx; 
+    		bx0_ = cx_; 
+    	} 
+    	((uint64_t*)ptr0)[0] = al0;
+    	((uint64_t*)ptr0_)[0] = al0_;
+
+    	if (ALGO == cryptonight_monero || ALGO == cryptonight_aeon || ALGO == cryptonight_ipbc || ALGO == cryptonight_stellite || ALGO == cryptonight_masari || ALGO == cryptonight_bittube2) 
+    	{ 
+    		if (ALGO == cryptonight_ipbc || ALGO == cryptonight_bittube2) {
+    			((uint64_t*)ptr0)[1] = ah0 ^ monero_const_0 ^ ((uint64_t*)ptr0)[0]; 
+    			((uint64_t*)ptr0_)[1] = ah0_ ^ monero_const_1 ^ ((uint64_t*)ptr0_)[0]; 
+          }
+    		else {
+    			((uint64_t*)ptr0)[1] = ah0 ^ monero_const_0; 
+    			((uint64_t*)ptr0_)[1] = ah0_ ^ monero_const_1; 
+          }
+    	} 
+    	else {
+    		((uint64_t*)ptr0)[1] = ah0; 
+    		((uint64_t*)ptr0_)[1] = ah0_; 
+        }
+    	al0 ^= cl; 
+    	al0_ ^= cl_; 
+    	ah0 ^= ch; 
+    	ah0_ ^= ch_; 
+    	ax0 = (__m128ll){al0, ah0}; 
+    	ax0_ = (__m128ll){al0_, ah0_}; 
+    	idx0 = al0;
+    	idx0_ = al0_;
+    	if(ALGO == cryptonight_heavy || ALGO == cryptonight_bittube2) 
+    	{ 
+    		ptr0 = (__m128i *)&l0[idx0 & MASK]; 
+      	ptr0_ = (__m128i *)&l0_[idx0_ & MASK]; 
+      	int64_t u  = ((int64_t*)ptr0)[0]; 
+      	int64_t u_  = ((int64_t*)ptr0_)[0]; 
+    		int32_t d  = ((int32_t*)ptr0)[2]; 
+    		int32_t d_  = ((int32_t*)ptr0_)[2]; 
+    		int64_t q = u / (d | 0x5); 
+    		int64_t q_ = u_ / (d_ | 0x5); 
+    		
+    		((int64_t*)ptr0)[0] = u ^ q; 
+    		((int64_t*)ptr0_)[0] = u_ ^ q_; 
+    		idx0 = d ^ q; 
+    		idx0_ = d_ ^ q_; 
+    	} 
+    	else if(ALGO == cryptonight_haven) 
+    	{ 
+    		ptr0 = (__m128i *)&l0[idx0 & MASK]; 
+    		ptr0_ = (__m128i *)&l0_[idx0_ & MASK]; 
+    		int64_t u  = ((int64_t*)ptr0)[0]; 
+    		int64_t u_  = ((int64_t*)ptr0_)[0]; 
+    		int32_t d  = ((int32_t*)ptr0)[2]; 
+    		int32_t d_  = ((int32_t*)ptr0_)[2]; 
+    		int64_t q = u / (d | 0x5); 
+    		int64_t q_ = u_ / (d_ | 0x5); 
+    		
+    		((int64_t*)ptr0)[0] = u ^ q; 
+    		((int64_t*)ptr0_)[0] = u_ ^ q_; 
+    		idx0 = (~d) ^ q; 
+    		idx0_ = (~d_) ^ q_; 
+    	}
+
+		}
+  	/* Optim - 90% time boundary */ 
+  	cn_implode_scratchpad<MEM, SOFT_AES, PREFETCH, ALGO>((__m128i*)ctx[0]->long_state, (__m128i*)ctx[0]->hash_state); 
+  	cn_implode_scratchpad<MEM, SOFT_AES, PREFETCH, ALGO>((__m128i*)ctx[1]->long_state, (__m128i*)ctx[1]->hash_state); 
+  	/* Optim - 99% time boundary */ 
+  	keccakf((uint64_t*)ctx[0]->hash_state, 24); 
+  	keccakf((uint64_t*)ctx[1]->hash_state, 24); 
+  	extra_hashes[ctx[0]->hash_state[0] & 3](ctx[0]->hash_state, 200, (char*)output + 32 * 0);
+  	extra_hashes[ctx[1]->hash_state[0] & 3](ctx[1]->hash_state, 200, (char*)output + 32 * 1);
 
 		}
 };
