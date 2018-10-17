@@ -25,8 +25,8 @@ list(APPEND CMAKE_PREFIX_PATH "$ENV{CMAKE_PREFIX_PATH}")
 # If you remove this guard to compile with older gcc versions the miner will produce
 # a high rate of wrong shares.
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.1)
-        message(FATAL_ERROR "g++ version must be at least 5.1!")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.3)
+        message(FATAL_ERROR "g++ version must be at least 6.3!")
     endif()
 endif()
 
@@ -40,8 +40,8 @@ set(XMR-STAK_COMPILE "native" CACHE STRING "select CPU compute architecture")
 set_property(CACHE XMR-STAK_COMPILE PROPERTY STRINGS "native;generic")
 if(XMR-STAK_COMPILE STREQUAL "native")
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        set(CMAKE_CXX_FLAGS "-march=native -mtune=native ${CMAKE_CXX_FLAGS}")
-        set(CMAKE_C_FLAGS "-march=native -mtune=native ${CMAKE_C_FLAGS}")
+        set(CMAKE_CXX_FLAGS "-mcpu=native -mtune=native  ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_C_FLAGS "-mcpu=native -mtune=native  ${CMAKE_C_FLAGS}")
     endif()
 elseif(XMR-STAK_COMPILE STREQUAL "generic")
     add_definitions("-DCONF_ENFORCE_OpenCL_1_2=1")
@@ -58,7 +58,7 @@ option(CMAKE_LINK_STATIC "link as much as possible libraries static" OFF)
 #option(CUDA_USE_STATIC_CUDA_RUNTIME "Use the static version of the CUDA runtime library if available" OFF)
 #set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE BOOL "Use the static version of the CUDA runtime library if available" FORCE)
 
-option(CUDA_ENABLE "Enable or disable CUDA support (NVIDIA backend)" ON)
+option(CUDA_ENABLE "Enable or disable CUDA support (NVIDIA backend)" OFF)
 if(CUDA_ENABLE)
     find_package(CUDA 7.5)
 
@@ -219,7 +219,7 @@ list(APPEND CMAKE_PREFIX_PATH "$ENV{CMAKE_PREFIX_PATH}")
 # Find OpenCL
 ###############################################################################
 
-option(OpenCL_ENABLE "Enable or disable OpenCL spport (AMD GPU support)" ON)
+option(OpenCL_ENABLE "Enable or disable OpenCL spport (AMD GPU support)" OFF)
 if(OpenCL_ENABLE)
     # try to find AMD OpenCL before NVIDIA OpenCL
     find_path(OpenCL_INCLUDE_DIR
@@ -431,8 +431,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     add_definitions(-DNOMINMAX)
 else()
     # activate sse2 and aes-ni
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2 -maes")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse2 -maes")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m64 -mdirect-move -mcrypto -mpower8-vector -flax-vector-conversions")
 endif()
 
 # add -Wall for debug builds with gcc
@@ -444,8 +444,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "-Wl,-z,noexecstack ${CMAKE_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "-Wl,-z,noexecstack ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "  ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "  ${CMAKE_C_FLAGS}")
 endif()
 
 # activate static libgcc and libstdc++ linking
@@ -458,26 +458,6 @@ if(CMAKE_LINK_STATIC)
     endif()
 endif()
 
-if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-    # asm optimized monero v8 code
-    enable_language(ASM_MASM)
-    set_property(SOURCE "xmrstak/backend/cpu/crypto/asm/cryptonight_v8_main_loop.asm" PROPERTY ASM_MASM)
-    add_library(xmr-stak-asm
-        STATIC
-        "xmrstak/backend/cpu/crypto/asm/cryptonight_v8_main_loop.asm"
-    )
-else()
-    # asm optimized monero v8 code
-    enable_language(ASM)
-    set_property(SOURCE "xmrstak/backend/cpu/crypto/asm/cryptonight_v8_main_loop.S" PROPERTY CPP)
-    set_source_files_properties("xmrstak/backend/cpu/crypto/asm/cryptonight_v8_main_loop.S" PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
-    add_library(xmr-stak-asm
-        STATIC
-        "xmrstak/backend/cpu/crypto/asm/cryptonight_v8_main_loop.S"
-    )
-endif()
-
-set_property(TARGET xmr-stak-asm PROPERTY LINKER_LANGUAGE C)
 
 # compile C files
 file(GLOB SRCFILES_C "xmrstak/backend/cpu/crypto/*.c")
@@ -490,7 +470,7 @@ set_property(TARGET xmr-stak-c PROPERTY C_STANDARD 99)
 if(MICROHTTPD_ENABLE)
     target_link_libraries(xmr-stak-c ${MHTD})
 endif()
-target_link_libraries(xmr-stak-c ${LIBS} xmr-stak-asm)
+target_link_libraries(xmr-stak-c ${LIBS})
 
 # compile generic backend files
 file(GLOB BACKEND_CPP
@@ -506,7 +486,7 @@ add_library(xmr-stak-backend
     STATIC
     ${BACKEND_CPP}
 )
-target_link_libraries(xmr-stak-backend xmr-stak-c ${CMAKE_DL_LIBS} xmr-stak-asm)
+target_link_libraries(xmr-stak-backend xmr-stak-c ${CMAKE_DL_LIBS})
 
 # compile CUDA backend
 if(CUDA_FOUND)
@@ -533,7 +513,7 @@ if(CUDA_FOUND)
         )
     endif()
     target_link_libraries(xmrstak_cuda_backend ${CUDA_LIBRARIES})
-    target_link_libraries(xmrstak_cuda_backend xmr-stak-backend xmr-stak-asm)
+    target_link_libraries(xmrstak_cuda_backend xmr-stak-backend)
 endif()
 
 # compile AMD backend
@@ -546,7 +526,7 @@ if(OpenCL_FOUND)
         ${OPENCLSRCFILES}
     )
     target_link_libraries(xmrstak_opencl_backend ${OpenCL_LIBRARY} )
-    target_link_libraries(xmrstak_opencl_backend xmr-stak-backend xmr-stak-asm)
+    target_link_libraries(xmrstak_opencl_backend xmr-stak-backend)
 endif()
 
 # compile final binary
@@ -562,7 +542,7 @@ endif()
 set(EXECUTABLE_OUTPUT_PATH "bin" CACHE STRING "Path to place executables relative to ${CMAKE_INSTALL_PREFIX}")
 set(LIBRARY_OUTPUT_PATH "bin" CACHE STRING "Path to place libraries relative to ${CMAKE_INSTALL_PREFIX}")
 
-target_link_libraries(xmr-stak ${LIBS} xmr-stak-c xmr-stak-backend xmr-stak-asm)
+target_link_libraries(xmr-stak ${LIBS} xmr-stak-c xmr-stak-backend)
 
 ################################################################################
 # Install

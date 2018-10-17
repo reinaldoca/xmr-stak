@@ -28,5 +28,7 @@ cmake-build-debug/
 .AppleDouble
 .LSOverride
 
+#vim tmp
+*.swp
 # Thumbnails
 ._*

@@ -24,7 +24,7 @@
 #include "minethd.hpp"
 #include "autoAdjust.hpp"
 #include "xmrstak/misc/console.hpp"
-#include "xmrstak/backend/cpu/crypto/cryptonight_aesni.h"
+#include "xmrstak/backend/cpu/crypto/cryptonight_altivec.h"
 #include "xmrstak/backend/cpu/crypto/cryptonight.h"
 #include "xmrstak/backend/cpu/minethd.hpp"
 #include "xmrstak/params.hpp"
@@ -43,13 +43,8 @@
 #include <vector>
 
 #ifndef USE_PRECOMPILED_HEADERS
-#ifdef WIN32
-#include <direct.h>
-#include <windows.h>
-#else
 #include <sys/types.h>
 #include <dlfcn.h>
-#endif
 #include <iostream>
 #endif
 

@@ -12,8 +12,8 @@ namespace cpu
 	{
 		uint32_t family = 0u;
 		uint32_t model = 0u;
-		bool aes = false;
-		bool sse2 = false;
+		bool aes = true;
+		bool sse2 = true;
 		bool avx = false;
 		std::string type_name = "unknown";
 	};

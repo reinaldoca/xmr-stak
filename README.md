@@ -1,15 +1,11 @@
 ###### fireice-uk's and psychocrypt's
+###### Ported by nioroso-x3 
+
 # XMR-Stak - Cryptonight All-in-One Mining Software
 
-XMR-Stak is a universal Stratum pool miner. This miner supports CPUs, AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon and many more Cryptonight coins.
+XMR-Stak is a universal Stratum pool miner. This miner supports CPUs.
+AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon and many more Cryptonight coins. Never tested in IBM POWER.
 
-## HTML reports
-<img src="https://gist.githubusercontent.com/fireice-uk/2da301131ac01695ff79539a27b81d68/raw/4c09cdeee86f94df2e9dd86b927e64aded6184f5/xmr-stak-cpu-hashrate.png" width="260"> <img src="https://gist.githubusercontent.com/fireice-uk/2da301131ac01695ff79539a27b81d68/raw/4c09cdeee86f94df2e9dd86b927e64aded6184f5/xmr-stak-cpu-results.png" width="260"> <img src="https://gist.githubusercontent.com/fireice-uk/2da301131ac01695ff79539a27b81d68/raw/4c09cdeee86f94df2e9dd86b927e64aded6184f5/xmr-stak-cpu-connection.png" width="260">
-
-## Video setup guide on Windows
-
-[<img src="https://gist.githubusercontent.com/fireice-uk/3621b179d56f57a8ead6303d8e415cf6/raw/f572faba67cc9418116f3c1dfd7783baf52182ce/vidguidetmb.jpg">](https://youtu.be/YNMa8NplWus)
-###### Video by Crypto Sewer
 
 ## Overview
 * [Features](#features)
@@ -23,12 +19,9 @@ XMR-Stak is a universal Stratum pool miner. This miner supports CPUs, AMD and NV
 
 ## Features
 
-- support all common backends (CPU/x86, AMD-GPU and NVIDIA-GPU)
-- support all common OS (Linux, Windows and macOS)
-- supports algorithm cryptonight for Monero (XMR) and cryptonight-light (AEON)
-- easy to use
-  - guided start (no need to edit a config file for the first start)
-  - auto-configuration for each backend
+- support CPU only
+- Linux only 
+- supports algorithm cryptonight for Monero (XMR) other shitcoins not tested.
 - open source software (GPLv3)
 - TLS support
 - [HTML statistics](doc/usage.md#html-and-json-api-report-configuraton)
@@ -36,49 +29,25 @@ XMR-Stak is a universal Stratum pool miner. This miner supports CPUs, AMD and NV
 
 ## Supported altcoins
 
-Besides [Monero](https://getmonero.org), following coins can be mined using this miner:
+Monero, others not tested.
 
-- [Aeon](http://www.aeon.cash)
-- [BBSCoin](https://www.bbscoin.xyz)
-- [BitTube](https://coin.bit.tube/)
-- [Graft](https://www.graft.network)
-- [Haven](https://havenprotocol.com)
-- [Intense](https://intensecoin.com)
-- [Masari](https://getmasari.org)
-- [QRL](https://theqrl.org)
-- **[Ryo](https://ryo-currency.com) - Upcoming xmr-stak-gui is sponsored by Ryo**
-- [TurtleCoin](https://turtlecoin.lol)
-
-Ryo currency is a way for us to implement the ideas that we were unable to in
-Monero. See [here](https://github.com/fireice-uk/cryptonote-speedup-demo/) for details.
-
-If your prefered coin is not listed, you can choose one of the following algorithms:
-
-- 1MiB scratchpad memory
-    - cryptonight_lite
-    - cryptonight_lite_v7
-    - cryptonight_lite_v7_xor (algorithm used by ipbc)
-- 2MiB scratchpad memory
-    - cryptonight
-    - cryptonight_masari
-    - cryptonight_v7
-    - cryptonight_v7_stellite
-    - cryptonight_v8
-- 4MiB scratchpad memory
-    - cryptonight_haven
-    - cryptonight_heavy
-
-Please note, this list is not complete and is not an endorsement.
 
 ## Download
 
-You can find the latest releases and precompiled binaries on GitHub under [Releases](https://github.com/fireice-uk/xmr-stak/releases).
+No binary releases.
+
+To compile use gcc 6.3.0 or newer.
 
 ## Default Developer Donation
 
-By default, the miner will donate 2% of the hashpower (2 minutes in 100 minutes) to my pool. If you want to change that, edit [donate-level.hpp](xmrstak/donate-level.hpp) before you build the binaries.
+By default, the miner will donate 0% of the hashpower until more optimizations are done.
 
 If you want to donate directly to support further development, here is my wallet
+
+nioroso-x3:
+```
+42UwBFuWj9uM7RjH15MXAFV7oLWUC9yLTArz4bmD3gbVWu1obYRUDe8K9v8StqXPhP2Uz1BJZgDQTUVhvT1cHFMBHA6aPg2
+```
 
 fireice-uk:
 ```

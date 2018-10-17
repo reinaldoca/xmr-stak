@@ -46,10 +46,6 @@
 #include <time.h>
 
 
-#ifdef _WIN32
-#define strncasecmp _strnicmp
-#endif // _WIN32
-
 executor::executor()
 {
 }
@@ -470,7 +466,6 @@ void executor::on_miner_result(size_t pool_id, job_result& oResult)
 	}
 }
 
-#ifndef _WIN32
 
 #include <signal.h>
 void disable_sigpipe()
@@ -483,9 +478,6 @@ void disable_sigpipe()
 		printer::inst()->print_msg(L1, "ERROR: Call to sigaction failed!");
 }
 
-#else
-inline void disable_sigpipe() {}
-#endif
 
 void executor::ex_main()
 {
@@ -627,12 +619,8 @@ void executor::ex_main()
 			break;
 
 		case EV_GPU_RES_ERROR:
-		{
-			std::string err_msg = std::string(ev.oGpuError.error_str) + " GPU ID " + std::to_string(ev.oGpuError.idx);
-			printer::inst()->print_msg(L0, err_msg.c_str());
-			log_result_error(std::move(err_msg));
+			log_result_error(std::string(ev.oGpuError.error_str + std::string(" GPU ID ") + std::to_string(ev.oGpuError.idx)));
 			break;
-		}
 
 		case EV_PERF_TICK:
 			for (i = 0; i < pvThreads->size(); i++)
@@ -860,11 +848,7 @@ char* time_format(char* buf, size_t len, std::chrono::system_clock::time_point t
 	 * And of course C++ implements unsafe version because... reasons
 	 */
 
-#ifdef _WIN32
-	localtime_s(&stime, &ctime);
-#else
 	localtime_r(&ctime, &stime);
-#endif // __WIN32
 	strftime(buf, len, "%F %T", &stime);
 
 	return buf;

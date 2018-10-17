@@ -7,14 +7,9 @@
 #include "xmrstak/misc/configEditor.hpp"
 #include "xmrstak/params.hpp"
 #include "xmrstak/backend/cryptonight.hpp"
-#include "xmrstak/backend/cpu/cpuType.hpp"
 #include <string>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
 #include <unistd.h>
-#endif // _WIN32
 
 
 namespace xmrstak
@@ -109,57 +104,14 @@ private:
 		int32_t cpu_info[4];
 		char cpustr[13] = {0};
 
-		::jconf::cpuid(0, 0, cpu_info);
-		memcpy(cpustr, &cpu_info[1], 4);
-		memcpy(cpustr+4, &cpu_info[3], 4);
-		memcpy(cpustr+8, &cpu_info[2], 4);
-
-		if(strcmp(cpustr, "GenuineIntel") == 0)
-		{
-			::jconf::cpuid(4, 3, cpu_info);
-
-			if(get_masked(cpu_info[0], 7, 5) != 3)
-			{
-				printer::inst()->print_msg(L0, "Autoconf failed: Couldn't find L3 cache page.");
-				return false;
-			}
-
-			L3KB_size = ((get_masked(cpu_info[1], 31, 22) + 1) * (get_masked(cpu_info[1], 21, 12) + 1) *
-				(get_masked(cpu_info[1], 11, 0) + 1) * (cpu_info[2] + 1)) / 1024;
-
-			return true;
-		}
-		else if(strcmp(cpustr, "AuthenticAMD") == 0)
-		{
-			::jconf::cpuid(0x80000006, 0, cpu_info);
-
-			L3KB_size = get_masked(cpu_info[3], 31, 18) * 512;
-
-			::jconf::cpuid(1, 0, cpu_info);
-
-			if(getModel().family < 0x17) //0x17h is Zen
-				old_amd = true;
-
-			return true;
-		}
-		else
-		{
 			printer::inst()->print_msg(L0, "Autoconf failed: Unknown CPU type: %s.", cpustr);
 			return false;
-		}
 	}
 
 	void detectCPUConf()
 	{
-#ifdef _WIN32
-		SYSTEM_INFO info;
-		GetSystemInfo(&info);
-		corecnt = info.dwNumberOfProcessors;
-		linux_layout = false;
-#else
 		corecnt = sysconf(_SC_NPROCESSORS_ONLN);
 		linux_layout = true;
-#endif // _WIN32
 	}
 
 	int32_t L3KB_size = 0;
