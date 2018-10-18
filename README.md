@@ -31,6 +31,7 @@ AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon a
 
 Monero, others not tested.
 
+Currently best performance is with 2 pinned threads per core, using low power mode 2.
 
 ## Download
 
