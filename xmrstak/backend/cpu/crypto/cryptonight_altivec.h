@@ -22,6 +22,7 @@
 #include <cfenv>
 #include <utility>
 #include "soft_aes_altivec.hpp"
+#include "FastSqrt_ppc64.h"
 #include <altivec.h>
 #include <math.h>
 #undef vector
@@ -303,8 +304,7 @@ void cn_implode_scratchpad(const __m128i* input, __m128i* output)
   vec_st(xout7,176,output);
 }
 
-inline uint64_t int_sqrt33_1_double_precision(const uint64_t n0)
-{
+inline uint64_t int_sqrt33_1_double_precision(const uint64_t n0){
   uint64_t r = (n0 >> 12) + (1023ULL << 52);
   double rd = sqrt( *(double*)&r );
   r = *(uint64_t*)&rd;
@@ -315,8 +315,11 @@ inline uint64_t int_sqrt33_1_double_precision(const uint64_t n0)
 	return r;
 }
 
-inline __m128i int_sqrt33_1_double_precision2(uint64_t n0,uint64_t n1)
-{
+inline uint64_t int_sqrt33_1_double_precision_fast(const uint64_t n0){
+   return SqrtV2::get(n0);
+}
+
+inline __m128i int_sqrt33_1_double_precision2(uint64_t n0,uint64_t n1){
   __m128d x = (__m128d)((__m128ll){n0 >> 12,n1 >> 12} + (__m128ll){1023ULL << 52,1023ULL << 52});
   x = vec_sqrt(x);
   uint64_t r0 = ((uint64_t*)&x)[0];
@@ -539,7 +542,7 @@ struct Cryptonight_hash<1>
     		const uint64_t division_result_ = static_cast<uint32_t>(cx_s / d) + ((cx_s % d) << 32); 
     		division_result = static_cast<int64_t>(division_result_); 
     		/* Use division_result as an input for the square root to prevent parallel implementation in hardware */ 
-    		sqrt_result = int_sqrt33_1_double_precision(cx_64 + division_result_); 
+    		sqrt_result = int_sqrt33_1_double_precision_fast(cx_64 + division_result_); 
     	}
 
     	{ 
