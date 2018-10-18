@@ -40,7 +40,7 @@ To compile use gcc 6.3.0 or newer.
 
 ## Default Developer Donation
 
-By default, the miner will donate 0% of the hashpower until more optimizations are done.
+By default, the miner will donate 1%, only for Monero.
 
 If you want to donate directly to support further development, here is my wallet
 
