@@ -103,7 +103,7 @@ bool jconf::GetThreadConfig(size_t id, thd_cfg &cfg)
 
 	const Value *mode, *no_prefetch, *aff, *asm_version;
 	mode = GetObjectMember(oThdConf, "low_power_mode");
-	no_prefetch = GetObjectMember(oThdConf, "no_prefetch");
+	no_prefetch = GetObjectMember(oThdConf, "int_sqrt");
 	aff = GetObjectMember(oThdConf, "affine_to_cpu");
 	asm_version = GetObjectMember(oThdConf, "asm");
 

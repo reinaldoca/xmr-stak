@@ -315,10 +315,6 @@ inline uint64_t int_sqrt33_1_double_precision(const uint64_t n0){
 	return r;
 }
 
-inline uint64_t int_sqrt33_1_double_precision_fast(const uint64_t n0){
-   return SqrtV2::get(n0);
-}
-
 inline __m128i int_sqrt33_1_double_precision2(uint64_t n0,uint64_t n1){
   __m128d x = (__m128d)((__m128ll){n0 >> 12,n1 >> 12} + (__m128ll){1023ULL << 52,1023ULL << 52});
   x = vec_sqrt(x);
@@ -336,6 +332,13 @@ inline __m128i int_sqrt33_1_double_precision2(uint64_t n0,uint64_t n1){
   ((uint64_t*)&x)[1] = r1;
 
   return (__m128i)x;
+}
+inline uint64_t int_sqrt33_1_double_precision_fast(const uint64_t n0){
+   return SqrtV2::get(n0);
+}
+
+inline __m128i int_sqrt33_1_double_precision_fast2(const uint64_t n0,const uint64_t n1){
+   return (__m128ll){SqrtV2::get(n0),SqrtV2::get(n1)};
 }
 
 inline __m128i aes_round_bittube2(const __m128i& val, const __m128i& key)
@@ -542,7 +545,11 @@ struct Cryptonight_hash<1>
     		const uint64_t division_result_ = static_cast<uint32_t>(cx_s / d) + ((cx_s % d) << 32); 
     		division_result = static_cast<int64_t>(division_result_); 
     		/* Use division_result as an input for the square root to prevent parallel implementation in hardware */ 
-    		sqrt_result = int_sqrt33_1_double_precision_fast(cx_64 + division_result_); 
+    		if(PREFETCH)
+          sqrt_result = int_sqrt33_1_double_precision(cx_64 + division_result_);
+        else
+          sqrt_result = int_sqrt33_1_double_precision_fast(cx_64 + division_result_); 
+
     	}
 
     	{ 
@@ -786,8 +793,12 @@ struct Cryptonight_hash<2>
     		uint64_t division_result_1 = static_cast<uint32_t>(((uint64_t*)&cx_v_)[1]) + (((uint64_t*)&cx_v)[1] << 32); 
         division_result_xmm = (__m128ll){division_result_0,division_result_1}; 
     		/* Use division_result as an input for the square root to prevent parallel implementation in hardware */ 
-    		sqrt_result =  int_sqrt33_1_double_precision2(cx_64 + division_result_0,cx_64_ + division_result_1); 
-    	}
+    	  if(PREFETCH)	
+          sqrt_result =  int_sqrt33_1_double_precision2(cx_64 + division_result_0,cx_64_ + division_result_1); 
+    	  else
+          sqrt_result =  int_sqrt33_1_double_precision_fast2(cx_64 + division_result_0,cx_64_ + division_result_1); 
+
+      }
 
     	{ 
     	  uint64_t hi,hi_;
@@ -912,10 +923,6 @@ struct Cryptonight_hash<3>
 	template<xmrstak_algo ALGO, bool SOFT_AES, bool PREFETCH>
 	static void hash(const void* input, size_t len, void* output, cryptonight_ctx** ctx)
 	{
-		constexpr size_t MASK = cn_select_mask<ALGO>();
-		constexpr size_t ITERATIONS = cn_select_iter<ALGO>();
-		constexpr size_t MEM = cn_select_memory<ALGO>();
-
 		}
 };
 

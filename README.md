@@ -31,7 +31,12 @@ AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon a
 
 Monero, others not tested.
 
-Currently best performance is with 2 pinned threads per core, using low power mode 2.
+Currently best performance is with 4 pinned threads per core, using low power mode 1 and int_sqrt set to true.
+Only low power modes 1 and 2 supported.
+
+
+Benchmarks:
+20 core power8, 2.83 GHz = 1600 hash/s, 80 hash/s per core CNv2
 
 ## Download
 
