@@ -72,7 +72,7 @@ configVal oConfigValues[] = {
 	{ sHttpLogin, "http_login", kStringType },
 	{ sHttpPass, "http_pass", kStringType },
 	{ bPreferIpv4, "prefer_ipv4", kTrueType },
-	{ bAesOverride, "aes_override", kNullType },
+	{ bAesOverride, "aes_override", kTrueType },
 	{ sUseSlowMem, "use_slow_memory", kStringType }
 };
 
@@ -551,7 +551,9 @@ bool jconf::parse_config(const char* sFilename, const char* sFilenamePools)
 		bHaveAes = prv->configValues[bAesOverride]->GetBool();
 
 	if(!bHaveAes)
-		printer::inst()->print_msg(L0, "Your CPU doesn't support hardware AES. Don't expect high hashrates.");
+		printer::inst()->print_msg(L0, "LE AES mode.");
+  else
+		printer::inst()->print_msg(L0, "BE AES mode.");
 
 	printer::inst()->set_verbose_level(prv->configValues[iVerboseLevel]->GetUint64());
 

@@ -92,3 +92,8 @@ static inline __m128i soft_aeskeygenassist(__m128i key, uint8_t rcon)
   return vec_xor(key,(__m128i){0,0,0,0, rcon,0,0,0, 0,0,0,0, rcon,0,0,0});
 }
 
+static inline __m128i soft_aeskeygenassist_be(__m128i key, uint8_t rcon)
+{
+  key = __builtin_crypto_vsbox(vec_perm(key,key,(__m128i){0x3,0x0,0x1,0x2, 0x0,0x1,0x2,0x3, 0xb,0x8,0x9,0xa, 0x8,0x9,0xa,0xb}));
+  return vec_xor(key,(__m128i){0,0,0,rcon, 0,0,0,0, 0,0,0,rcon, 0,0,0,0});
+}

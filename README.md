@@ -9,17 +9,11 @@ AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon a
 
 ## Overview
 * [Features](#features)
-* [Supported altcoins](#supported-altcoins)
-* [Download](#download)
 * [Usage](doc/usage.md)
-* [HowTo Compile](doc/compile.md)
-* [FAQ](doc/FAQ.md)
-* [Developer Donation](#default-developer-donation)
-* [Developer PGP Key's](doc/pgp_keys.md)
 
 ## Features
 
-- support CPU only
+- support CPU only, GPU not tested.
 - Linux only 
 - supports algorithm cryptonight for Monero (XMR) other shitcoins not tested.
 - open source software (GPLv3)
@@ -32,7 +26,8 @@ AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon a
 Monero, others not tested.
 
 Currently best performance is with 4 pinned threads per core, using low power mode 1 and int_sqrt set to true.
-Only low power modes 1 and 2 supported.
+Low power modes 1,2 and 3 are supported.
+To use big endian AES optimization for Power8, set aesoverride in config.txt to true.
 
 
 Benchmarks:
