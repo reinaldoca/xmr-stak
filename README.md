@@ -4,7 +4,7 @@
 # XMR-Stak - Cryptonight All-in-One Mining Software
 
 XMR-Stak is a universal Stratum pool miner. This miner supports CPUs.
-AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon and many more Cryptonight coins. Never tested in IBM POWER.
+AMD and NVIDIA GPUs and can be used to mine the crypto currencies Monero, Aeon and many more Cryptonight coins but are not  tested in IBM POWER.
 
 
 ## Overview
